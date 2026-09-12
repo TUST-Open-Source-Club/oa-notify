@@ -73,6 +73,17 @@ async fn main() -> anyhow::Result<()> {
     });
     load_jwks_with_retry(&state).await?;
 
+    // 配置了 Redis 时启用事件总线消费者
+    if let Some(redis_url) = state.config.redis_url.clone() {
+        let consumer_state = state.clone();
+        let consumer_name = format!("notify-{}", std::process::id());
+        tokio::spawn(async move {
+            notify_service::consumer::run(consumer_state, redis_url, consumer_name).await;
+        });
+    } else {
+        tracing::warn!("未配置 REDIS_URL，事件总线消费者未启动（仅支持内部 HTTP 投递）");
+    }
+
     let listener = TcpListener::bind(&state.config.bind_addr)
         .await
         .with_context(|| format!("监听 {} 失败", state.config.bind_addr))?;

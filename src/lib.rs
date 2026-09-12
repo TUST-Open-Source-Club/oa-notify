@@ -9,12 +9,16 @@
 #![warn(missing_docs)]
 
 pub mod config;
+/// Redis Streams 事件消费者。
+pub mod consumer;
 /// 数据库连接辅助。
 pub mod db;
 pub mod domain;
 /// 对外 DTO。
 pub mod dto;
 pub mod entity;
+/// 事件处理核心（HTTP 与总线共用）。
+pub mod ingest;
 pub mod migration;
 pub mod ntfy;
 /// 数据访问层。

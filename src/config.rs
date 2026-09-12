@@ -23,6 +23,8 @@ pub struct Config {
     pub ntfy_public_url: String,
     /// 开发模式：使用日志发布器而非真实 ntfy。
     pub dev_mode: bool,
+    /// Redis 连接串（设置后启用事件总线消费者）。
+    pub redis_url: Option<String>,
 }
 
 impl Config {
@@ -59,6 +61,7 @@ impl Config {
                 .trim_end_matches('/')
                 .to_string(),
             dev_mode: matches!(get("DEV_MODE"), Some("1") | Some("true")),
+            redis_url: get("REDIS_URL").map(str::to_string),
         })
     }
 }
