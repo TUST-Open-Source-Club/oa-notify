@@ -25,6 +25,11 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// 当前 UTC 时间（后续可抽为 Clock trait 以便测试注入）。
+    pub fn now(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
+    }
+
     /// 从 auth 的 JWKS 端点加载公钥。
     pub async fn load_jwks(&self) -> anyhow::Result<()> {
         let url = format!("{}/.well-known/jwks.json", self.config.issuer);

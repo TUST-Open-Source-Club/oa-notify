@@ -39,12 +39,25 @@ impl Config {
             database_url: get("DATABASE_URL")
                 .ok_or_else(|| anyhow!("缺少必填环境变量 DATABASE_URL"))?
                 .to_string(),
-            bind_addr: get("NOTIFY_BIND_ADDR").unwrap_or("0.0.0.0:8088").to_string(),
-            issuer: get("AUTH_ISSUER").unwrap_or("http://localhost:8081").trim_end_matches('/').to_string(),
-            internal_secret: get("INTERNAL_SERVICE_SECRET").unwrap_or("dev-internal-secret").to_string(),
-            ntfy_base_url: get("NTFY_BASE_URL").unwrap_or("http://localhost:8090").trim_end_matches('/').to_string(),
+            bind_addr: get("NOTIFY_BIND_ADDR")
+                .unwrap_or("0.0.0.0:8088")
+                .to_string(),
+            issuer: get("AUTH_ISSUER")
+                .unwrap_or("http://localhost:8081")
+                .trim_end_matches('/')
+                .to_string(),
+            internal_secret: get("INTERNAL_SERVICE_SECRET")
+                .unwrap_or("dev-internal-secret")
+                .to_string(),
+            ntfy_base_url: get("NTFY_BASE_URL")
+                .unwrap_or("http://localhost:8090")
+                .trim_end_matches('/')
+                .to_string(),
             ntfy_token: get("NTFY_TOKEN").unwrap_or_default().to_string(),
-            ntfy_public_url: get("NTFY_PUBLIC_URL").unwrap_or("http://localhost:8090").trim_end_matches('/').to_string(),
+            ntfy_public_url: get("NTFY_PUBLIC_URL")
+                .unwrap_or("http://localhost:8090")
+                .trim_end_matches('/')
+                .to_string(),
             dev_mode: matches!(get("DEV_MODE"), Some("1") | Some("true")),
         })
     }

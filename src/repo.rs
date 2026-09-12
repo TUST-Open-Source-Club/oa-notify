@@ -62,30 +62,38 @@ pub async fn insert_notification_idempotent(
         read_at: Set(None),
         created_at: Set(now.fixed_offset()),
     };
-    // SeaORM 2.0：冲突时忽略，并用 TryInsertResult 区分「已插入 / 已存在」
+    // SeaORM 2.0：`exec_without_returning` 在 SQL 成功时返回 Inserted(rows_affected)，
+    // DO NOTHING 冲突时 rows_affected = 0，需据行数判断是否真的插入。
     let result = notification::Entity::insert(model)
         .on_conflict_do_nothing_on([notification::Column::UserId, notification::Column::EventId])
         .exec_without_returning(db)
         .await
         .map_err(map_db_err)?;
-    Ok(matches!(result, TryInsertResult::Inserted(_)))
+    match result {
+        TryInsertResult::Inserted(rows) => Ok(rows > 0),
+        TryInsertResult::Conflicted | TryInsertResult::Empty => Ok(false),
+    }
 }
 
-/// 游标分页查询通知（按创建时间倒序），`unread_only` 仅返回未读。
+/// 游标分页查询通知（按 UUIDv7 主键倒序，天然时间有序）。
 ///
-/// 返回的记录可能比 limit 多一条，供调用方裁剪并生成 nextCursor。
+/// `cursor` 为上一页最后一条记录的 ID；返回记录可能比 limit 多一条，
+/// 供调用方裁剪并生成 nextCursor。
 pub async fn list_notifications(
     db: &DatabaseConnection,
     user_id: Uuid,
     unread_only: bool,
+    cursor: Option<Uuid>,
     params: &CursorParams,
 ) -> Result<Vec<notification::Model>, AppError> {
     let limit = i64::from(params.limit()) + 1;
     let mut select = notification::Entity::find()
         .filter(notification::Column::UserId.eq(user_id))
-        .order_by_desc(notification::Column::CreatedAt)
         .order_by_desc(notification::Column::Id)
         .limit(limit as u64);
+    if let Some(cursor) = cursor {
+        select = select.filter(notification::Column::Id.lt(cursor));
+    }
     if unread_only {
         select = select.filter(notification::Column::ReadAt.is_null());
     }

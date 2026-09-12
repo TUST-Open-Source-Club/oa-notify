@@ -9,6 +9,8 @@
 #![warn(missing_docs)]
 
 pub mod config;
+/// 数据库连接辅助。
+pub mod db;
 pub mod domain;
 /// 对外 DTO。
 pub mod dto;
@@ -17,5 +19,22 @@ pub mod migration;
 pub mod ntfy;
 /// 数据访问层。
 pub mod repo;
+/// HTTP 路由。
+pub mod routes;
 /// 应用状态。
 pub mod state;
+
+use axum::Router;
+use tower_http::trace::TraceLayer;
+
+use crate::state::SharedState;
+
+/// 构建完整的 HTTP 路由（/healthz、/readyz 与 /api/v1/notify/*）。
+pub fn build_router(state: SharedState) -> Router {
+    Router::new()
+        .route("/healthz", axum::routing::get(routes::health::healthz))
+        .route("/readyz", axum::routing::get(routes::health::readyz))
+        .nest("/api/v1/notify", routes::router())
+        .layer(TraceLayer::new_for_http())
+        .with_state(state)
+}

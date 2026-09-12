@@ -170,8 +170,14 @@ mod tests {
     #[test]
     fn priority_normalization_and_mapping() {
         assert_eq!(envelope("a.b", None).normalized_priority(), "default");
-        assert_eq!(envelope("a.b", Some("nope")).normalized_priority(), "default");
-        assert_eq!(envelope("a.b", Some("urgent")).normalized_priority(), "urgent");
+        assert_eq!(
+            envelope("a.b", Some("nope")).normalized_priority(),
+            "default"
+        );
+        assert_eq!(
+            envelope("a.b", Some("urgent")).normalized_priority(),
+            "urgent"
+        );
         assert_eq!(ntfy_priority("urgent"), 5);
         assert_eq!(ntfy_priority("high"), 4);
         assert_eq!(ntfy_priority("default"), 3);
@@ -201,7 +207,10 @@ mod tests {
         assert!(!in_quiet_window(22 * 60, 7 * 60, 12 * 60));
         assert!(in_quiet_window(9 * 60, 18 * 60, 10 * 60));
         assert!(!in_quiet_window(9 * 60, 18 * 60, 20 * 60));
-        assert!(!in_quiet_window(9 * 60, 9 * 60, 9 * 60), "相等窗口视为不启用");
+        assert!(
+            !in_quiet_window(9 * 60, 9 * 60, 9 * 60),
+            "相等窗口视为不启用"
+        );
     }
 
     #[test]
@@ -212,13 +221,28 @@ mod tests {
             quiet_to: Some("07:00".into()),
             ntfy_enabled: true,
         };
-        assert!(!should_deliver(&prefs, "im", Some(12 * 60), false), "静音模块");
-        assert!(!should_deliver(&prefs, "task", Some(23 * 60), false), "免打扰");
+        assert!(
+            !should_deliver(&prefs, "im", Some(12 * 60), false),
+            "静音模块"
+        );
+        assert!(
+            !should_deliver(&prefs, "task", Some(23 * 60), false),
+            "免打扰"
+        );
         assert!(should_deliver(&prefs, "task", Some(12 * 60), false));
         // 紧急消息绕过免打扰，但显式静音的模块仍然拦截
-        assert!(should_deliver(&prefs, "task", Some(23 * 60), true), "紧急绕过免打扰");
-        assert!(!should_deliver(&prefs, "im", Some(12 * 60), true), "静音模块优先");
-        let disabled = PreferenceView { ntfy_enabled: false, ..prefs.clone() };
+        assert!(
+            should_deliver(&prefs, "task", Some(23 * 60), true),
+            "紧急绕过免打扰"
+        );
+        assert!(
+            !should_deliver(&prefs, "im", Some(12 * 60), true),
+            "静音模块优先"
+        );
+        let disabled = PreferenceView {
+            ntfy_enabled: false,
+            ..prefs.clone()
+        };
         assert!(!should_deliver(&disabled, "task", Some(12 * 60), false));
     }
 
