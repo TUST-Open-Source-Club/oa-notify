@@ -1652,6 +1652,7 @@ dependencies = [
  "club-auth-sdk",
  "club-common",
  "http-body-util",
+ "jsonwebtoken",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

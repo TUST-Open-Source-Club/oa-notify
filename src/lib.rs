@@ -10,6 +10,12 @@
 
 pub mod config;
 pub mod domain;
+/// 对外 DTO。
+pub mod dto;
 pub mod entity;
 pub mod migration;
 pub mod ntfy;
+/// 数据访问层。
+pub mod repo;
+/// 应用状态。
+pub mod state;
