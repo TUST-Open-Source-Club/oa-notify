@@ -11,6 +11,8 @@ pub struct Model {
     pub id: Uuid,
     /// 归属用户。
     pub user_id: Uuid,
+    /// 推送厂商：apple/huawei/honor/xiaomi/oppo/vivo/meizu/fcm。
+    pub vendor: String,
     /// 平台：ios / android。
     pub platform: String,
     /// 推送 token（APNs device token；Android 为客户端标识）。

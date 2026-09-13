@@ -65,10 +65,38 @@ async fn main() -> anyhow::Result<()> {
         ))
     };
 
+    // 多通道推送路由：厂商凭据接入前使用日志通道（开发），未配置厂商自动降级 FCM → ntfy
+    let mut vendors: std::collections::HashMap<String, Arc<dyn notify_service::push::PushChannel>> =
+        std::collections::HashMap::new();
+    if config.dev_mode {
+        for (vendor, name) in [
+            ("huawei", "huawei"),
+            ("honor", "honor"),
+            ("xiaomi", "xiaomi"),
+            ("oppo", "oppo"),
+            ("vivo", "vivo"),
+            ("meizu", "meizu"),
+        ] {
+            vendors.insert(
+                vendor.to_string(),
+                Arc::new(notify_service::push::LogChannel { channel: name }),
+            );
+        }
+    }
+    let push = Arc::new(notify_service::push::PushRouter {
+        vendors,
+        fcm: config.dev_mode.then(|| {
+            Arc::new(notify_service::push::LogChannel { channel: "fcm" })
+                as Arc<dyn notify_service::push::PushChannel>
+        }),
+        ntfy: publisher.clone(),
+    });
+
     let state = SharedState::new(AppState {
         db: database,
         config,
         ntfy: publisher,
+        push,
         signing_key: RwLock::new(None),
     });
     load_jwks_with_retry(&state).await?;

@@ -13,16 +13,20 @@ use crate::dto::DeviceDto;
 use crate::repo;
 use crate::state::SharedState;
 
-/// 允许的平台。
-const PLATFORMS: &[&str] = &["ios", "android"];
+/// 允许的厂商（与 push::VENDORS 对齐）。
+const VENDORS: &[&str] = &[
+    "apple", "huawei", "honor", "xiaomi", "oppo", "vivo", "meizu", "fcm",
+];
 
 /// 注册设备请求。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterDeviceRequest {
-    /// 平台：ios / android。
-    pub platform: String,
-    /// 推送 token。
+    /// 厂商：apple/huawei/honor/xiaomi/oppo/vivo/meizu/fcm。
+    pub vendor: String,
+    /// 平台：ios / android / harmony。
+    pub platform: Option<String>,
+    /// 推送 token（厂商 token 或 FCM token）。
     pub token: String,
     /// 设备名称。
     pub device_name: Option<String>,
@@ -43,13 +47,20 @@ pub async fn register_device(
     Json(input): Json<RegisterDeviceRequest>,
 ) -> Result<Json<DeviceDto>, AppError> {
     let user_id = user_id_of(&auth)?;
-    if !PLATFORMS.contains(&input.platform.as_str()) {
+    if !VENDORS.contains(&input.vendor.as_str()) {
         return Err(AppError::unprocessable(
             "NOTIFY_VALIDATION",
-            "平台不合法",
-            vec![FieldError::new("platform", "仅支持 ios / android")],
+            "厂商不合法",
+            vec![FieldError::new("vendor", "不在支持列表")],
         ));
     }
+    let platform = input.platform.unwrap_or_else(|| {
+        if input.vendor == "apple" {
+            "ios".to_string()
+        } else {
+            "android".to_string()
+        }
+    });
     if input.token.trim().len() < 8 {
         return Err(AppError::unprocessable(
             "NOTIFY_VALIDATION",
@@ -60,7 +71,8 @@ pub async fn register_device(
     let model = repo::upsert_device(
         &state.db,
         user_id,
-        &input.platform,
+        &input.vendor,
+        &platform,
         input.token.trim(),
         input.device_name,
         chrono::Utc::now(),

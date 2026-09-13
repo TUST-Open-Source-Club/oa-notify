@@ -20,6 +20,8 @@ pub struct AppState {
     pub config: Config,
     /// ntfy 发布端口。
     pub ntfy: Arc<dyn NtfyPublisher>,
+    /// 多通道推送路由。
+    pub push: Arc<crate::push::PushRouter>,
     /// 用于验签的解码 key（JWKS 缓存）。
     pub signing_key: RwLock<Option<DecodingKey>>,
 }

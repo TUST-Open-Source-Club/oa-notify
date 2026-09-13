@@ -256,7 +256,7 @@ async fn devices_register_list_and_revoke() {
         "POST",
         "/api/v1/notify/devices",
         Some(&token),
-        Some(&json!({ "platform": "ios", "token": "apns-token-123456", "deviceName": "iPhone" })),
+        Some(&json!({ "vendor": "apple", "platform": "ios", "token": "apns-token-123456", "deviceName": "iPhone" })),
     )
     .await;
     registered.expect(StatusCode::OK);
@@ -271,6 +271,7 @@ async fn devices_register_list_and_revoke() {
     .await;
     let devices = devices.expect(StatusCode::OK);
     assert_eq!(devices.as_array().unwrap().len(), 1);
+    assert_eq!(devices[0]["vendor"], "apple");
 
     // 非法平台 → 422
     let invalid = request(
@@ -278,7 +279,7 @@ async fn devices_register_list_and_revoke() {
         "POST",
         "/api/v1/notify/devices",
         Some(&token),
-        Some(&json!({ "platform": "desktop", "token": "apns-token-123456" })),
+        Some(&json!({ "vendor": "desktop", "token": "apns-token-123456" })),
     )
     .await;
     invalid.expect(StatusCode::UNPROCESSABLE_ENTITY);
@@ -454,6 +455,7 @@ async fn jwks_loading_and_token_verification() {
         db: app.state.db.clone(),
         config: config.clone(),
         ntfy: app.ntfy.clone(),
+        push: app.state.push.clone(),
         signing_key: RwLock::new(None),
     });
 
@@ -479,4 +481,46 @@ async fn jwks_loading_and_token_verification() {
     assert_eq!(verified.name, "u");
     // 坏令牌 → 401
     assert!(state2.verify_token("bad-token").is_err());
+}
+
+#[tokio::test]
+async fn multi_channel_fallback_chain() {
+    let app = spawn().await;
+    let user = Uuid::now_v7();
+    let token = issue_token(&app, user);
+
+    request(
+        &app.app,
+        "POST",
+        "/api/v1/notify/devices",
+        Some(&token),
+        Some(&json!({ "vendor": "huawei", "platform": "android", "token": "huawei-token-1" })),
+    )
+    .await
+    .expect(StatusCode::OK);
+
+    service_post(
+        &app,
+        "task",
+        "/api/v1/notify/internal/events",
+        &event(&[user], "task.assigned", Some("high")),
+    )
+    .await
+    .expect(StatusCode::OK);
+    assert_eq!(app.vendor.count(), 1, "应走华为通道");
+    assert_eq!(app.fcm.count(), 0);
+    assert_eq!(app.ntfy.count(), 0, "厂商成功不应兜底 ntfy");
+
+    app.vendor.set_fail(true);
+    service_post(
+        &app,
+        "task",
+        "/api/v1/notify/internal/events",
+        &event(&[user], "task.comment.added", Some("high")),
+    )
+    .await
+    .expect(StatusCode::OK);
+    assert_eq!(app.vendor.count(), 2);
+    assert_eq!(app.fcm.count(), 1, "厂商失败后应尝试 FCM");
+    assert_eq!(app.ntfy.count(), 1, "FCM 失败后应兜底 ntfy");
 }

@@ -200,16 +200,19 @@ pub async fn upsert_preference(
     .map_err(map_db_err)
 }
 
-/// 注册/更新推送设备（token 唯一，重新登录时转移归属）。
+/// 注册/更新推送设备（同一设备可登记多个厂商 token，按 (vendor, token) 唯一）。
+#[allow(clippy::too_many_arguments)]
 pub async fn upsert_device(
     db: &DatabaseConnection,
     user_id: Uuid,
+    vendor: &str,
     platform: &str,
     token: &str,
     device_name: Option<String>,
     now: DateTime<Utc>,
 ) -> Result<device::Model, AppError> {
     if let Some(existing) = device::Entity::find()
+        .filter(device::Column::Vendor.eq(vendor))
         .filter(device::Column::Token.eq(token))
         .one(db)
         .await
@@ -226,6 +229,7 @@ pub async fn upsert_device(
     device::ActiveModel {
         id: Set(new_id()),
         user_id: Set(user_id),
+        vendor: Set(vendor.to_string()),
         platform: Set(platform.to_string()),
         token: Set(token.to_string()),
         device_name: Set(device_name),

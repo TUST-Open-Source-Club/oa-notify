@@ -100,6 +100,8 @@ impl From<&preference::Model> for PreferenceDto {
 pub struct DeviceDto {
     /// 设备记录 ID。
     pub id: String,
+    /// 厂商。
+    pub vendor: String,
     /// 平台。
     pub platform: String,
     /// 设备名称。
@@ -113,6 +115,7 @@ impl From<&device::Model> for DeviceDto {
     fn from(model: &device::Model) -> Self {
         Self {
             id: model.id.to_string(),
+            vendor: model.vendor.clone(),
             platform: model.platform.clone(),
             device_name: model.device_name.clone(),
             last_seen_at: model.last_seen_at,

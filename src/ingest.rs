@@ -6,9 +6,8 @@ use chrono::{FixedOffset, Timelike};
 
 use club_common::AppError;
 
-use crate::domain::{should_deliver, topic_for, EventEnvelope, PreferenceView};
+use crate::domain::{should_deliver, EventEnvelope, PreferenceView};
 use crate::dto::PreferenceDto;
-use crate::ntfy::NtfyMessage;
 use crate::repo;
 use crate::state::AppState;
 
@@ -69,17 +68,17 @@ pub async fn apply_event(state: &AppState, event: &EventEnvelope) -> Result<(u32
             Some(local_minutes),
             event.is_urgent(),
         ) {
-            let message = NtfyMessage {
-                topic: topic_for(*user_id),
+            let message = crate::push::PushMessage {
                 title: event.title.clone(),
-                message: event.body.clone(),
+                body: event.body.clone(),
+                url: event.resource.as_ref().and_then(|r| r.url.clone()),
                 priority: event.normalized_priority().to_string(),
-                click: event.resource.as_ref().and_then(|r| r.url.clone()),
             };
-            match state.ntfy.publish(&message).await {
-                Ok(()) => pushed += 1,
+            match state.push.dispatch(&state.db, *user_id, &message).await {
+                Ok(outcome) if outcome.delivered() => pushed += 1,
+                Ok(_) => tracing::warn!(user = %user_id, "所有推送通道均失败（通知已落库）"),
                 Err(err) => {
-                    tracing::warn!(error = %err, user = %user_id, "ntfy 推送失败（通知已落库）")
+                    tracing::warn!(error = %err, user = %user_id, "推送时出错（通知已落库）")
                 }
             }
         }

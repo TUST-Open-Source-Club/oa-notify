@@ -21,6 +21,8 @@ pub mod entity;
 pub mod ingest;
 pub mod migration;
 pub mod ntfy;
+/// 多通道推送路由。
+pub mod push;
 /// 数据访问层。
 pub mod repo;
 /// HTTP 路由。

@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use async_trait::async_trait;
@@ -19,6 +20,7 @@ use club_common::AppError;
 use notify_service::config::Config;
 use notify_service::migration::Migrator;
 use notify_service::ntfy::{NtfyMessage, NtfyPublisher};
+use notify_service::push::{PushChannel, PushMessage, PushRouter};
 use notify_service::state::{AppState, SharedState};
 use notify_service::{build_router, db};
 
@@ -50,6 +52,57 @@ impl FakeNtfy {
     }
 }
 
+/// 可控制失败并记录调用的推送通道替身。
+pub struct FakeChannel {
+    /// 通道名。
+    pub name: &'static str,
+    /// 是否模拟失败。
+    pub fail: AtomicBool,
+    /// 调用记录。
+    pub calls: Mutex<Vec<String>>,
+}
+
+impl FakeChannel {
+    /// 创建通道。
+    pub fn new(name: &'static str, fail: bool) -> Self {
+        Self {
+            name,
+            fail: AtomicBool::new(fail),
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// 设置失败开关。
+    pub fn set_fail(&self, fail: bool) {
+        self.fail.store(fail, Ordering::SeqCst);
+    }
+
+    /// 调用次数。
+    pub fn count(&self) -> usize {
+        self.calls.lock().expect("lock").len()
+    }
+}
+
+#[async_trait::async_trait]
+impl PushChannel for FakeChannel {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    async fn send(
+        &self,
+        _device: &notify_service::entity::device::Model,
+        _message: &PushMessage,
+    ) -> Result<(), AppError> {
+        self.calls.lock().expect("lock").push(self.name.to_string());
+        if self.fail.load(Ordering::SeqCst) {
+            Err(AppError::internal("fake channel down"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// 测试应用。
 pub struct TestApp {
     /// 应用状态。
@@ -58,6 +111,10 @@ pub struct TestApp {
     pub app: Router,
     /// ntfy 替身。
     pub ntfy: Arc<FakeNtfy>,
+    /// 厂商通道替身（huawei）。
+    pub vendor: Arc<FakeChannel>,
+    /// FCM 替身（默认失败，便于验证降级）。
+    pub fcm: Arc<FakeChannel>,
     /// 测试 schema 名。
     pub schema: String,
     /// 服务密钥（签发测试 JWT 用）。
@@ -102,10 +159,20 @@ pub async fn spawn() -> TestApp {
     let config = Config::from_map(&env).expect("配置");
 
     let ntfy = Arc::new(FakeNtfy::default());
+    let vendor = Arc::new(FakeChannel::new("huawei", false));
+    let fcm = Arc::new(FakeChannel::new("fcm", true));
+    let mut vendors: HashMap<String, Arc<dyn PushChannel>> = HashMap::new();
+    vendors.insert("huawei".to_string(), vendor.clone());
+    let push = Arc::new(PushRouter {
+        vendors,
+        fcm: Some(fcm.clone()),
+        ntfy: ntfy.clone(),
+    });
     let state = SharedState::new(AppState {
         db: database,
         config,
         ntfy: ntfy.clone(),
+        push,
         signing_key: RwLock::new(Some(decoding)),
     });
     let app = build_router(state.clone());
@@ -113,6 +180,8 @@ pub async fn spawn() -> TestApp {
         state,
         app,
         ntfy,
+        vendor,
+        fcm,
         schema,
         signing: jwks,
         private_pem: private.private_pem.clone(),
