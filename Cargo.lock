@@ -550,12 +550,15 @@ dependencies = [
 name = "club-bus"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "club-common",
  "redis",
+ "sea-orm",
  "serde",
  "serde_json",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
